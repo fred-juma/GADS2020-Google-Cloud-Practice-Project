@@ -1,0 +1,206 @@
+Course: Associate Cloud Engineer: Learning Phase 1 Main Track Channel (2020)
+
+Module: Virtual Networks
+Lab: VPC Networking
+
+Objectives
+- Explore the default VPC network
+- Create an auto mode network with firewall rules
+- Convert an auto mode network to a custom mode network
+- Create custom mode VPC networks with firewall rules
+- Create VM instances using Compute Engine
+- Explore the connectivity for VM instances across VPC networks
+
+
+
+Task 1: Task 1. Explore the default network
+
+a) View the networks
+
+gcloud compute networks list
+
+
+view subnets in the default network
+
+gcloud compute networks subnets list --filter="network:default"
+
+
+b) View the routes
+
+gcloud compute routes list --filter="network=default"
+
+
+c) View the firewall rules
+
+gcloud compute firewall-rules list --filter="network=default"
+
+d) Delete the Firewall rules
+
+gcloud compute firewall-rules delete default-allow-icmp
+gcloud compute firewall-rules delete default-allow-internal
+gcloud compute firewall-rules delete default-allow-rdp
+gcloud compute firewall-rules delete default-allow-ssh
+
+h) Delete the default network
+
+gcloud compute networks delete default
+
+i) Try to create a VM instance
+
+gcloud compute instances create instance-1 \
+  --network default \
+  --region us-central1
+
+  gcloud compute instances create instance-1 \
+    --network default \
+ 	--region us-central1
+    --image debian-10-buster-v20200309 \
+    --image-family --image-family debian-10
+   
+Task 2. Create an auto mode network
+
+a) Create an auto mode VPC network with firewall rules
+
+export MYPROJECT = qwiklabs-gcp-00-91fc28f8cb9c
+
+gcloud compute networks create mynetwork $MYPROJECT --subnet-mode=auto --bgp-routing-mode=regional
+
+gcloud compute firewall-rules create allow-icmp $MYPROJECT --network=projects/qwiklabs-gcp-00-91fc28f8cb9c/global/networks/mynetwork\ --description=Allows\ ICMP\ connections\ from\ any\ source\ to\ any\ instance\ on\ the\ network. --direction=INGRESS --priority=65534 --source-ranges=0.0.0.0/0\ --action=ALLOW --rules=icmp
+
+gcloud compute firewall-rules create allow-internal $MYPROJECT --network=projects/qwiklabs-gcp-00-91fc28f8cb9c/global/networks/mynetwork\ --description=Allows\ connections\ from\ any\ source\ in\ the\ network\ IP\ range\ to\ any\ instance\ on\ the\ network\ using\ all\ protocols. --direction=INGRESS\ --priority=65534 --source-ranges=10.128.0.0/9 --action=ALLOW --rules=all
+
+gcloud compute firewall-rules create allow-rdp $MYPROJECT --network=projects/qwiklabs-gcp-00-91fc28f8cb9c/global/networks/mynetwork\ --description=Allows\ RDP\ connections\ from\ any\ source\ to\ any\ instance\ on\ the\ network\ using\ port\ 3389. --direction=INGRESS --priority=65534\ --source-ranges=0.0.0.0/0 --action=ALLOW --rules=tcp:3389
+
+gcloud compute firewall-rules create allow-ssh $MYPROJECT --network=projects/qwiklabs-gcp-00-91fc28f8cb9c/global/networks/mynetwork\ --description=Allows\ TCP\ connections\ from\ any\ source\ to\ any\ instance\ on\ the\ network\ using\ port\ 22. --direction=INGRESS --priority=65534\ --source-ranges=0.0.0.0/0 --action=ALLOW --rules=tcp:22
+
+
+b) Create a VM instance in us-central1
+
+gcloud beta compute $MYPROJECT instances create mynet-us-vm --zone=us-central1-c --machine-type=n1-standard-1 --subnet=mynetwork --network-tier=PREMIUM\ --maintenance-policy=MIGRATE --service-account=167970509176-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=debian-10-buster-v20200910\ --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=mynet-us-vm --no-shielded-secure-boot --no-shielded-vtpm\ --no-shielded-integrity-monitoring --reservation-affinity=any
+
+c) Create a VM instance in europe-west1
+gcloud beta compute $MYPROJECT instances create mynet-eu-vm --zone=europe-west1-c --machine-type=n1-standard-1 --subnet=mynetwork --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=167970509176-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=debian-10-buster-v20200910 --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=mynet-eu-vm --no-shielded-secure-boot --no-shielded-vtpm --no-shielded-integrity-monitoring --reservation-affinity=any
+
+
+d) Verify connectivity for the VM instances
+
+ping -c 3 mynet-us-vm
+
+ping -c 3 mynet-eu-vm
+
+
+
+
+e) Convert the network to a custom mode network
+
+gcloud compute networks update default \
+    --switch-to-custom-subnet-mode
+
+
+Task 3. Create custom mode networks
+
+a) Create the managementnet network
+
+gcloud compute networks create managementnet $MYPROJECT --subnet-mode=custom --bgp-routing-mode=regional\
+
+gcloud compute networks subnets create managementsubnet-us $MYPROJECT --range=10.130.0.0/20 --network=managementnet --region=us-central1
+
+
+b) Create the privatenet network
+
+gcloud compute networks create privatenet --subnet-mode=custom
+
+
+gcloud compute networks subnets create privatesubnet-us --network=privatenet --region=us-central1 --range=172.16.0.0/24
+
+gcloud compute networks subnets create privatesubnet-eu --network=privatenet --region=europe-west1 --range=172.20.0.0/20
+
+
+
+
+c) Create the firewall rules for managementnet
+
+gcloud compute  firewall-rules create managementnet-allow-icmp-ssh-rdp --direction=INGRESS --priority=1000 --network=managementnet --action=ALLOW --rules=tcp:22,tcp:3389,icmp --source-ranges=0.0.0.0/0
+
+
+d) Create the firewall rules for privatenet
+
+gcloud compute firewall-rules create privatenet-allow-icmp-ssh-rdp --direction=INGRESS --priority=1000 --network=privatenet --action=ALLOW --rules=icmp,tcp:22,tcp:3389 --source-ranges=0.0.0.0/0
+
+
+e) Create the managementnet-us-vm instance
+
+gcloud beta compute $MYPROJECT instances create managementnet-us-vm --zone=us-central1-c --machine-type=n1-standard-1 --subnet=managementsubnet-us --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=167970509176-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=debian-10-buster-v20200910 --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=managementnet-us-vm --no-shielded-secure-boot --no-shielded-vtpm --no-shielded-integrity-monitoring --reservation-affinity=any
+
+f) Create the privatenet-us-vm instance
+
+gcloud compute instances create privatenet-us-vm --zone=us-central1-c --machine-type=f1-micro --subnet=privatesubnet-us --image-family=debian-10 --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=privatenet-us-vm
+
+
+Task 4. Explore the connectivity across networks
+
+ping -c 3 <Enter mynet-eu-vm's external IP here>
+
+ping -c 3 <Enter managementnet-us-vm's external IP here>
+
+ping -c 3 <Enter privatenet-us-vm's external IP here>
+
+
+
+
+
+
+
+
+
+Module: Virtual Machines
+
+Lab: Creating Virtual Machines
+
+Objectives
+- Create several standard VMs
+
+- Create advanced VMs
+
+
+Task 1: Create a utility virtual machine
+
+a) Create a VM
+
+gcloud beta compute $MYPROJECT instances create instance-1 --zone=us-central1-c --machine-type=n1-standard-1 --subnet=default --no-address --maintenance-policy=MIGRATE --service-account=882100000461-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=debian-10-buster-v20200910 --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=instance-1 --no-shielded-secure-boot --no-shielded-vtpm --no-shielded-integrity-monitoring --reservation-affinity=any
+
+
+b) Explore the VM details
+
+gcloud compute instances describe instance-1
+
+
+Task 2: Create a Windows virtual machine
+
+gcloud beta compute $MYPROJECT instances create instance-2 --zone=europe-west2-a --machine-type=n1-standard-2 --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=882100000461-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --tags=http-server,https-server --image=windows-server-2016-dc-core-v20200908 --image-project=windows-cloud --boot-disk-size=100GB --boot-disk-type=pd-standard --boot-disk-device-name=instance-2 --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute $MYPROJECT firewall-rules create default-allow-http --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:80 --source-ranges=0.0.0.0/0 --target-tags=http-server
+
+gcloud compute $MYPROJECT firewall-rules create default-allow-https --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:443 --source-ranges=0.0.0.0/0 --target-tags=https-server
+
+
+
+
+Task 3: Create a custom virtual machine
+
+
+
+gcloud beta compute $MYPROJECT instances create instance-3 --zone=europe-west1-b --machine-type=custom-6-32768 --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=882100000461-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=debian-10-buster-v20200910 --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=instance-3 --no-shielded-secure-boot --no-shielded-vtpm --no-shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute ssh my-custom-vm --zone=us-west1-b
+
+To see information about unused and used memory and swap space on your custom VM, run the following command:
+free
+To see details about the RAM installed on your VM, run the following command:
+sudo dmidecode -t 17
+To verify the number of processors, run the following command:
+nproc
+To see details about the CPUs installed on your VM, run the following command:
+lscpu
+To exit the SSH terminal, run the following command:
+exit
